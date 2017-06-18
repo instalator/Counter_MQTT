@@ -1,0 +1,123 @@
+//--------------------------------- Functions ---------------------------------//
+/////////////////////////////////От Брокера//////////////////////////////////////////////
+void callback_iobroker(String strTopic, String strPayload){
+  if (strTopic == "myhome/counter/Power") {
+    if (strPayload == "true") {
+    }
+  }
+  else if (strTopic == "myhome/counter/correction") {
+      cnt_1 = strPayload.substring(0,strPayload.indexOf(';')).toInt();
+      cnt_2 = strPayload.substring(strPayload.lastIndexOf(';')+1).toInt();
+  }
+  else if (strTopic == "myhome/counter/save") {
+    if (strPayload == "true"){
+      save();
+      client.publish("myhome/counter/save", "false");
+    }
+  }
+  else if (strTopic == "myhome/counter/config/polling") {
+      poll = strPayload.toInt();
+      EEPROMWriteInt(POLL_ADR, poll);  //Интервал публикации
+      client.publish("myhome/counter/config/polling", IntToChar(poll));
+  }
+  else if (strTopic == "myhome/counter/config/namur") {
+      namur = SrtToBool(strPayload);
+      EEPROM.write(NAMUR_ADR, BoolToInt(namur));
+      client.publish("myhome/counter/config/namur", BoolToChar(namur));
+      reboot();
+  }
+  else if (strTopic == "myhome/counter/config/reset") {
+      if(strPayload == "true"){
+        client.publish("myhome/counter/config/reset", "false");
+        reboot();
+      }
+  }
+}
+
+void save(){
+  chk = cnt_1 - cnt_2;
+  EEPROMWriteInt(CNT1_ADR, cnt_1);  //Пишем показания счетчика в eeprom из переменной
+  EEPROMWriteInt(CNT2_ADR, cnt_2);  //Пишем показания счетчика в eeprom из переменной
+  EEPROMWriteInt(POLL_ADR, poll);  //Интервал публикации
+  EEPROM.write(NAMUR_ADR, BoolToInt(namur));  //тип счетчика
+  EEPROMWriteInt(CHK_ADR, chk);  //тип счетчика
+}
+
+void reboot(){
+  wdt_enable(WDTO_1S);
+  for(;;){}
+}
+
+char* IntToChar (unsigned long intV) {
+  String data = String(intV, DEC);
+  int length = data.length();
+  char b[50];
+  data.toCharArray(b,length + 1);
+  return b;
+}
+
+int SrtToBool(String t){
+    if (t == "false" || t == "0" || t == "off"){
+      return false;
+    } else {
+      return true;
+    }
+}
+
+char* BoolToChar (bool r) {
+    if (r == true){
+      return "true";
+    } else{
+      return "false";
+    }
+}
+
+int BoolToInt(bool s){
+    if (s){
+      return 1;
+    } else {
+      return 0;
+    }
+}
+int IntToBool(int i){
+    if (i == 1){
+      return true;
+    } else {
+      return false;
+    }
+}
+
+void namurON(){
+  digitalWrite(CTRL_D1, LOW);
+  digitalWrite(CTRL_D2, LOW);
+  digitalWrite(CTRL_A1, HIGH);
+  digitalWrite(CTRL_A2, HIGH);
+}
+
+void namurOFF(){
+  digitalWrite(CTRL_D1, HIGH);
+  digitalWrite(CTRL_D2, HIGH);
+  digitalWrite(CTRL_A1, LOW);
+  digitalWrite(CTRL_A2, LOW);
+}
+
+////////////////////////////////////ФУНКЦИИ ПАМЯТИ///////////////////////////////////////////
+//кушаем аж 4 байта EEPROM
+void EEPROMWriteInt(int p_address, unsigned long p_value){
+    byte four = (p_value & 0xFF);
+    byte three = ((p_value >> 8) & 0xFF);
+    byte two = ((p_value >> 16) & 0xFF);
+    byte one = ((p_value >> 24) & 0xFF);
+    EEPROM.write(p_address, four);
+    EEPROM.write(p_address + 1, three);
+    EEPROM.write(p_address + 2, two);
+    EEPROM.write(p_address + 3, one);
+}
+// считаем нашы 4 байта
+unsigned long EEPROMReadInt(int p_address){
+   long four = EEPROM.read(p_address);
+   long three = EEPROM.read(p_address + 1);
+   long two = EEPROM.read(p_address + 2);
+   long one = EEPROM.read(p_address + 3);
+   return ((four << 0) & 0xFF) + ((three << 8) & 0xFFFF) + ((two << 16) & 0xFFFFFF) + ((one << 24) & 0xFFFFFFFF);
+ }
