@@ -6,8 +6,8 @@ void callback_iobroker(String strTopic, String strPayload){
     }
   }
   else if (strTopic == "myhome/counter/correction") {
-      cnt_1 = strPayload.substring(0,strPayload.indexOf(';')).toInt();
-      cnt_2 = strPayload.substring(strPayload.lastIndexOf(';')+1).toInt();
+      cnt_1 = strPayload.substring(0,strPayload.indexOf(';')).toInt() / ratio;
+      cnt_2 = strPayload.substring(strPayload.lastIndexOf(';')+1).toInt() / ratio;
   }
   else if (strTopic == "myhome/counter/save") {
     if (strPayload == "true"){
@@ -24,13 +24,24 @@ void callback_iobroker(String strTopic, String strPayload){
       namur = SrtToBool(strPayload);
       EEPROM.write(NAMUR_ADR, BoolToInt(namur));
       client.publish("myhome/counter/config/namur", BoolToChar(namur));
+      save();
       reboot();
   }
   else if (strTopic == "myhome/counter/config/reset") {
       if(strPayload == "true"){
+        save();
         client.publish("myhome/counter/config/reset", "false");
         reboot();
       }
+  }
+  else if (strTopic == "myhome/counter/config/ratio") {
+      ratio = strPayload.toInt();
+      if (ratio < 1){
+        ratio = 1;
+      } else if (ratio > 255){
+        ratio = 255;
+      }
+      client.publish("myhome/counter/config/ratio", IntToChar(ratio));
   }
 }
 
@@ -40,7 +51,8 @@ void save(){
   EEPROMWriteInt(CNT2_ADR, cnt_2);  //Пишем показания счетчика в eeprom из переменной
   EEPROMWriteInt(POLL_ADR, poll);  //Интервал публикации
   EEPROM.write(NAMUR_ADR, BoolToInt(namur));  //тип счетчика
-  EEPROMWriteInt(CHK_ADR, chk);  //тип счетчика
+  EEPROMWriteInt(CHK_ADR, chk);
+  EEPROM.write(RATIO_ADR, ratio);  //Множитель
 }
 
 void reboot(){
