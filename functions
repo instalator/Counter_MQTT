@@ -43,6 +43,22 @@ void callback_iobroker(String strTopic, String strPayload){
       }
       client.publish("myhome/counter/config/ratio", IntToChar(ratio));
   }
+  else if (strTopic == "myhome/counter/config/interrupt") {
+    /*
+      1 - CHANGE прерывание вызывается при смене значения на порту, с LOW на HIGH и наоборот
+      2 - RISING прерывание вызывается только при смене значения на порту с LOW на HIGH
+      3 - FALLING прерывание вызывается только при смене значения на порту с HIGH на LOW
+    */
+      interrupt = strPayload.toInt();
+      if (interrupt < 1){
+        interrupt = 1;
+      } else if (ratio > 3){
+        interrupt = 3;
+      }
+      attachInterrupt(0, Count_1, interrupt);
+      attachInterrupt(1, Count_2, interrupt);
+      client.publish("myhome/counter/config/interrupt", IntToChar(interrupt));
+  }
 }
 
 void save(){
@@ -51,8 +67,9 @@ void save(){
   EEPROMWriteInt(CNT2_ADR, cnt_2);  //Пишем показания счетчика в eeprom из переменной
   EEPROMWriteInt(POLL_ADR, poll);  //Интервал публикации
   EEPROM.write(NAMUR_ADR, BoolToInt(namur));  //тип счетчика
-  EEPROMWriteInt(CHK_ADR, chk);
+  EEPROMWriteInt(CHK_ADR, chk); //чек
   EEPROM.write(RATIO_ADR, ratio);  //Множитель
+  EEPROM.write(INTERRUPT_ADR, interrupt); //Вектор прерывания
 }
 
 void reboot(){
@@ -97,6 +114,13 @@ int IntToBool(int i){
     } else {
       return false;
     }
+}
+
+char* StrToChar (String str){
+    int length = str.length();
+    char a[50];
+    str.toCharArray(a, length + 1);
+    return a;
 }
 
 void namurON(){
