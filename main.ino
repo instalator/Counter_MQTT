@@ -28,14 +28,15 @@ IPAddress server(192, 168, 1, 190);
 #define CNT2_ADR  20
 #define POLL_ADR  30
 #define NAMUR_ADR 40
+#define RATIO_ADR 50
 
-#define ratio 1 //Литры за один импульс *10
 volatile unsigned long cnt_1 = 0;  // Начальные показания Холодной воды
 volatile unsigned long cnt_2 = 0;  // Начальнаые показания Горячей воды
 unsigned long chk = 0;
 long prevMillis = 0;
 bool namur = false;
 long poll = 5000;
+int ratio = 1; //Множитель от 1 до 255
 
 ////////////////////////////////////////////////////////////////////////////
 void callback(char* topic, byte* payload, unsigned int length) {
@@ -72,6 +73,7 @@ void setup(){
     cnt_2 = EEPROMReadInt(CNT2_ADR);
     poll = EEPROMReadInt(POLL_ADR);
     namur = IntToBool(EEPROM.read(NAMUR_ADR));
+    ratio = EEPROM.read(RATIO_ADR);
     if (chk != (cnt_1 - cnt_2)){
        client.publish("myhome/counter/error", "CHK");
     }
@@ -118,8 +120,8 @@ void loop(){
 
   if (millis() - prevMillis > poll){
     prevMillis = millis();
-    client.publish("myhome/counter/count_1", IntToChar(cnt_1));
-    client.publish("myhome/counter/count_2", IntToChar(cnt_2));
+    client.publish("myhome/counter/count_1", IntToChar(cnt_1 * ratio));
+    client.publish("myhome/counter/count_2", IntToChar(cnt_2 * ratio));
     client.publish("myhome/counter/PWR_CTRL", IntToChar(analogRead(PWR_CTRL))); 
   }
   
@@ -131,6 +133,7 @@ void loop(){
 
 void Public(){
   client.publish("myhome/counter/error", "false");
+  client.publish("myhome/counter/config/ratio", IntToChar(ratio));
   client.publish("myhome/counter/config/namur", BoolToChar(namur));
   client.publish("myhome/counter/config/polling", IntToChar(poll));
   client.publish("myhome/counter/save", "false");
