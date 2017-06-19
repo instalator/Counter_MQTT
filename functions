@@ -59,6 +59,16 @@ void callback_iobroker(String strTopic, String strPayload){
       attachInterrupt(1, Count_2, interrupt);
       client.publish("myhome/counter/config/interrupt", IntToChar(interrupt));
   }
+  else if (strTopic == "myhome/counter/config/namur_lvl") {
+      nmr_lvl = strPayload.toInt();
+      EEPROM.write(NMR_LVL_ADR, nmr_lvl);  //Namur высокий уровень
+      client.publish("myhome/counter/config/namur_lvl", IntToChar(nmr_lvl));
+  }
+  else if (strTopic == "myhome/counter/config/namur_brk") {
+      nmr_brk = strPayload.toInt();
+      EEPROM.write(NMR_BRK_ADR, nmr_brk);  //Namur уровень обрыва
+      client.publish("myhome/counter/config/namur_brk", IntToChar(nmr_brk));
+  }
 }
 
 void save(){
@@ -70,6 +80,8 @@ void save(){
   EEPROMWriteInt(CHK_ADR, chk); //чек
   EEPROM.write(RATIO_ADR, ratio);  //Множитель
   EEPROM.write(INTERRUPT_ADR, interrupt); //Вектор прерывания
+  EEPROM.write(NMR_LVL_ADR, nmr_lvl);  //Namur высокий уровень
+  EEPROM.write(NMR_BRK_ADR, nmr_brk);  //Namur уровень обрыва
 }
 
 void reboot(){
