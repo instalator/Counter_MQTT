@@ -30,6 +30,8 @@ IPAddress server(192, 168, 1, 190);
 #define NAMUR_ADR     40
 #define RATIO_ADR     50
 #define INTERRUPT_ADR 60
+#define NMR_LVL_ADR   70
+#define NMR_BRK_ADR   80
 
 volatile unsigned long cnt_1 = 0;  // Начальные показания Холодной воды
 volatile unsigned long cnt_2 = 0;  // Начальнаые показания Горячей воды
@@ -41,6 +43,12 @@ bool namur = false;
 long poll = 5000;
 int ratio = 1; //Множитель от 1 до 255
 int interrupt = FALLING;
+int nmr_lvl = 512;
+int nmr_brk = 200;
+int Ain_1 = 0;
+int Ain_2 = 0;
+int prevAin_1;
+int prevAin_2;
 
 ////////////////////////////////////////////////////////////////////////////
 void callback(char* topic, byte* payload, unsigned int length) {
@@ -79,6 +87,8 @@ void setup(){
     namur = IntToBool(EEPROM.read(NAMUR_ADR));
     ratio = EEPROM.read(RATIO_ADR);
     interrupt = EEPROM.read(INTERRUPT_ADR);
+    nmr_lvl = EEPROM.read(NMR_LVL_ADR);
+    nmr_brk = EEPROM.read(NMR_BRK_ADR);
     if (chk != (cnt_1 - cnt_2)){
        client.publish("myhome/counter/error", "CHK");
     }
@@ -124,22 +134,52 @@ void loop(){
   }
   
   if (namur){
-    //считаем по аналоговым
+    int in_1 = analogRead(AIN_1);
+    int in_2 = analogRead(AIN_2);
+    if (in_1 > nmr_brk && in_1 > nmr_lvl){
+      Ain_1 = 1;
+    } else if(in_1 > nmr_brk && in_1 < nmr_lvl){
+      Ain_1 = 0;
+    } else if (in_1 < nmr_brk){
+        //client.publish("myhome/counter/error", "Analog input 1");
+    }
+    if (in_2 > nmr_brk && in_2 > nmr_lvl){
+      Ain_2 = 1;
+    } else if(in_2 > nmr_brk && in_2 < nmr_lvl){
+      Ain_2 = 0;
+    } else if (in_2 < nmr_brk){
+        //client.publish("myhome/counter/error", "Analog input 2");
+    }
+    if (Ain_1 != prevAin_1 && Ain_1 == 1){
+      cnt_1++;
+      prevAin_1 = Ain_1;
+      digitalWrite(LED, !digitalRead(LED));
+    }
+    if (Ain_2 != prevAin_2 && Ain_2 == 1){
+      cnt_2++;
+      prevAin_2 = Ain_2;
+      digitalWrite(LED, !digitalRead(LED));
+    }
   }
 
-  if (millis() - prevMillis > poll && (cnt_1 != prev_cnt_1 || cnt_2 != prev_cnt_2)){
+  if (millis() - prevMillis > poll){
     prevMillis = millis();
-    prev_cnt_1 = cnt_1;
-    prev_cnt_2 = cnt_2;
-    client.publish("myhome/counter/count_1", IntToChar(cnt_1 * ratio));
-    client.publish("myhome/counter/count_2", IntToChar(cnt_2 * ratio));
+       client.publish("myhome/counter/a1", IntToChar(analogRead(AIN_1))); /**/
+       client.publish("myhome/counter/a2", IntToChar(analogRead(AIN_2))); /**/
+    if (cnt_1 != prev_cnt_1 || cnt_2 != prev_cnt_2){
+      prev_cnt_1 = cnt_1;
+      prev_cnt_2 = cnt_2;
+      client.publish("myhome/counter/count_1", IntToChar(cnt_1 * ratio));
+      client.publish("myhome/counter/count_2", IntToChar(cnt_2 * ratio));
+    }
   } 
   
 }
 
 void Public(){
-  
   client.publish("myhome/counter/error", "false");
+  client.publish("myhome/counter/config/namur_lvl", IntToChar(nmr_lvl));
+  client.publish("myhome/counter/config/namur_brk", IntToChar(nmr_brk));
   client.publish("myhome/counter/config/interrupt", IntToChar(interrupt));
   client.publish("myhome/counter/config/ratio", IntToChar(ratio));
   client.publish("myhome/counter/config/namur", BoolToChar(namur));
