@@ -17,7 +17,7 @@ void callback_iobroker(String strTopic, String strPayload){
   }
   else if (strTopic == "myhome/counter/config/polling") {
       poll = strPayload.toInt();
-      EEPROMWriteInt(POLL_ADR, poll);  //Интервал публикации
+      EEPROMWriteLong(POLL_ADR, poll);  //Интервал публикации
       client.publish("myhome/counter/config/polling", IntToChar(poll));
   }
   else if (strTopic == "myhome/counter/config/namur") {
@@ -43,45 +43,72 @@ void callback_iobroker(String strTopic, String strPayload){
       }
       client.publish("myhome/counter/config/ratio", IntToChar(ratio));
   }
-  else if (strTopic == "myhome/counter/config/interrupt") {
-    /*
+        /*
       1 - CHANGE прерывание вызывается при смене значения на порту, с LOW на HIGH и наоборот
       2 - RISING прерывание вызывается только при смене значения на порту с LOW на HIGH
       3 - FALLING прерывание вызывается только при смене значения на порту с HIGH на LOW
-    */
-      interrupt = strPayload.toInt();
-      if (interrupt < 1){
-        interrupt = 1;
+        */
+  else if (strTopic == "myhome/counter/config/interrupt_1") {
+      interrupt_1 = strPayload.toInt();
+      if (interrupt_1 < 1){
+        interrupt_1 = 1;
       } else if (ratio > 3){
-        interrupt = 3;
+        interrupt_1 = 3;
       }
-      attachInterrupt(0, Count_1, interrupt);
-      attachInterrupt(1, Count_2, interrupt);
-      client.publish("myhome/counter/config/interrupt", IntToChar(interrupt));
+      if (!namur){
+        attachInterrupt(0, Count_1, interrupt_1);
+        attachInterrupt(1, Count_2, interrupt_2);
+      }
+      client.publish("myhome/counter/config/interrupt_1", IntToChar(interrupt_1));
   }
-  else if (strTopic == "myhome/counter/config/namur_lvl") {
-      nmr_lvl = strPayload.toInt();
-      EEPROM.write(NMR_LVL_ADR, nmr_lvl);  //Namur высокий уровень
-      client.publish("myhome/counter/config/namur_lvl", IntToChar(nmr_lvl));
+  else if (strTopic == "myhome/counter/config/interrupt_2") {
+      interrupt_2 = strPayload.toInt();
+      if (interrupt_2 < 1){
+        interrupt_2 = 1;
+      } else if (ratio > 3){
+        interrupt_2 = 3;
+      }
+      if (!namur){
+        attachInterrupt(0, Count_1, interrupt_1);
+        attachInterrupt(1, Count_2, interrupt_2);
+      }
+      client.publish("myhome/counter/config/interrupt_2", IntToChar(interrupt_2));
   }
-  else if (strTopic == "myhome/counter/config/namur_brk") {
-      nmr_brk = strPayload.toInt();
-      EEPROM.write(NMR_BRK_ADR, nmr_brk);  //Namur уровень обрыва
-      client.publish("myhome/counter/config/namur_brk", IntToChar(nmr_brk));
+  else if (strTopic == "myhome/counter/config/namur_lvl_1") {
+      nmr_lvl_1 = strPayload.toInt();
+      EEPROMWriteInt(NMR_LVL1_ADR, nmr_lvl_1);  //Namur высокий уровень
+      client.publish("myhome/counter/config/namur_lvl_1", IntToChar(nmr_lvl_1));
+  }
+  else if (strTopic == "myhome/counter/config/namur_brk_1") {
+      nmr_brk_1 = strPayload.toInt();
+      EEPROMWriteInt(NMR_BRK1_ADR, nmr_brk_1);  //Namur уровень обрыва
+      client.publish("myhome/counter/config/namur_brk_1", IntToChar(nmr_brk_1));
+  }
+  else if (strTopic == "myhome/counter/config/namur_lvl_2") {
+      nmr_lvl_2 = strPayload.toInt();
+      EEPROMWriteInt(NMR_LVL2_ADR, nmr_lvl_2);  //Namur высокий уровень
+      client.publish("myhome/counter/config/namur_lvl_2", IntToChar(nmr_lvl_2));
+  }
+  else if (strTopic == "myhome/counter/config/namur_brk_2") {
+      nmr_brk_2 = strPayload.toInt();
+      EEPROMWriteInt(NMR_BRK2_ADR, nmr_brk_2);  //Namur уровень обрыва
+      client.publish("myhome/counter/config/namur_brk_2", IntToChar(nmr_brk_2));
   }
 }
-
 void save(){
   chk = cnt_1 - cnt_2;
-  EEPROMWriteInt(CNT1_ADR, cnt_1);  //Пишем показания счетчика в eeprom из переменной
-  EEPROMWriteInt(CNT2_ADR, cnt_2);  //Пишем показания счетчика в eeprom из переменной
-  EEPROMWriteInt(POLL_ADR, poll);  //Интервал публикации
+  EEPROMWriteLong(CNT1_ADR, cnt_1);  //Пишем показания счетчика в eeprom из переменной
+  EEPROMWriteLong(CNT2_ADR, cnt_2);  //Пишем показания счетчика в eeprom из переменной
+  EEPROMWriteLong(POLL_ADR, poll);  //Интервал публикации
   EEPROM.write(NAMUR_ADR, BoolToInt(namur));  //тип счетчика
-  EEPROMWriteInt(CHK_ADR, chk); //чек
+  EEPROMWriteLong(CHK_ADR, chk); //чек
   EEPROM.write(RATIO_ADR, ratio);  //Множитель
-  EEPROM.write(INTERRUPT_ADR, interrupt); //Вектор прерывания
-  EEPROM.write(NMR_LVL_ADR, nmr_lvl);  //Namur высокий уровень
-  EEPROM.write(NMR_BRK_ADR, nmr_brk);  //Namur уровень обрыва
+  EEPROM.write(INTERRUPT_1_ADR, interrupt_1); //Вектор прерывания
+  EEPROM.write(INTERRUPT_2_ADR, interrupt_2); //Вектор прерывания
+  EEPROMWriteInt(NMR_LVL1_ADR, nmr_lvl_1);  //Namur высокий уровень
+  EEPROMWriteInt(NMR_BRK1_ADR, nmr_brk_1);  //Namur уровень обрыва
+  EEPROMWriteInt(NMR_LVL2_ADR, nmr_lvl_2);  //Namur высокий уровень
+  EEPROMWriteInt(NMR_BRK2_ADR, nmr_brk_2);  //Namur уровень обрыва
 }
 
 void reboot(){
@@ -151,7 +178,7 @@ void namurOFF(){
 
 ////////////////////////////////////ФУНКЦИИ ПАМЯТИ///////////////////////////////////////////
 //кушаем аж 4 байта EEPROM
-void EEPROMWriteInt(int p_address, unsigned long p_value){
+void EEPROMWriteLong(int p_address, unsigned long p_value){
     byte four = (p_value & 0xFF);
     byte three = ((p_value >> 8) & 0xFF);
     byte two = ((p_value >> 16) & 0xFF);
@@ -162,10 +189,22 @@ void EEPROMWriteInt(int p_address, unsigned long p_value){
     EEPROM.write(p_address + 3, one);
 }
 // считаем нашы 4 байта
-unsigned long EEPROMReadInt(int p_address){
+unsigned long EEPROMReadLong(int p_address){
    long four = EEPROM.read(p_address);
    long three = EEPROM.read(p_address + 1);
    long two = EEPROM.read(p_address + 2);
    long one = EEPROM.read(p_address + 3);
    return ((four << 0) & 0xFF) + ((three << 8) & 0xFFFF) + ((two << 16) & 0xFFFFFF) + ((one << 24) & 0xFFFFFFFF);
  }
+
+void EEPROMWriteInt(int p_address, int p_value){
+     byte lowByte = ((p_value >> 0) & 0xFF);
+     byte highByte = ((p_value >> 8) & 0xFF);
+     EEPROM.write(p_address, lowByte);
+     EEPROM.write(p_address + 1, highByte);
+   }
+unsigned int EEPROMReadInt(int p_address){
+     byte lowByte = EEPROM.read(p_address);
+     byte highByte = EEPROM.read(p_address + 1);
+     return ((lowByte << 0) & 0xFF) + ((highByte << 8) & 0xFF00);
+   }
