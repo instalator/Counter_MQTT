@@ -23,32 +23,41 @@ IPAddress server(192, 168, 1, 190);
 #define CTRL_A2 7  //Выход для управления коммутатором
 #define LED     9  //Светодиод
 
-#define CHK_ADR       99
-#define CNT1_ADR      10
-#define CNT2_ADR      20
-#define POLL_ADR      30
-#define NAMUR_ADR     40
-#define RATIO_ADR     50
-#define INTERRUPT_ADR 60
-#define NMR_LVL_ADR   70
-#define NMR_BRK_ADR   80
+#define CHK_ADR         99
+#define CNT1_ADR        10
+#define CNT2_ADR        20
+#define POLL_ADR        30
+#define NAMUR_ADR       40
+#define RATIO_ADR       50
+#define INTERRUPT_1_ADR 60
+#define INTERRUPT_2_ADR 62
+#define NMR_LVL1_ADR    70
+#define NMR_BRK1_ADR    72
+#define NMR_LVL2_ADR    74
+#define NMR_BRK2_ADR    76
+
 
 volatile unsigned long cnt_1 = 0;  // Начальные показания Холодной воды
 volatile unsigned long cnt_2 = 0;  // Начальнаые показания Горячей воды
-unsigned long prev_cnt_1;
-unsigned long prev_cnt_2;
+unsigned long prev_cnt_1 = 1;
+unsigned long prev_cnt_2 = 1;
 unsigned long chk = 0;
 long prevMillis = 0;
 bool namur = false;
 long poll = 5000;
 int ratio = 1; //Множитель от 1 до 255
-int interrupt = FALLING;
-int nmr_lvl = 512;
-int nmr_brk = 200;
+int interrupt_1 = FALLING;
+int interrupt_2 = FALLING;
+int nmr_lvl_1 = 512;
+int nmr_brk_1 = 200;
+int nmr_lvl_2 = 512;
+int nmr_brk_2 = 200;
 int Ain_1 = 0;
 int Ain_2 = 0;
 int prevAin_1;
 int prevAin_2;
+bool error = 0;
+
 
 ////////////////////////////////////////////////////////////////////////////
 void callback(char* topic, byte* payload, unsigned int length) {
@@ -79,18 +88,22 @@ void setup(){
   if (EEPROM.read(1)!= 88 && EEPROM.read(90)!= 99){ //Если первый запуск
     EEPROM.write(1, 88);
     EEPROM.write(90, 99);
+    save();
   } else {
-    chk = EEPROMReadInt(CHK_ADR);
-    cnt_1 = EEPROMReadInt(CNT1_ADR);
-    cnt_2 = EEPROMReadInt(CNT2_ADR);
-    poll = EEPROMReadInt(POLL_ADR);
+    chk = EEPROMReadLong(CHK_ADR);
+    cnt_1 = EEPROMReadLong(CNT1_ADR);
+    cnt_2 = EEPROMReadLong(CNT2_ADR);
+    poll = EEPROMReadLong(POLL_ADR);
     namur = IntToBool(EEPROM.read(NAMUR_ADR));
     ratio = EEPROM.read(RATIO_ADR);
-    interrupt = EEPROM.read(INTERRUPT_ADR);
-    nmr_lvl = EEPROM.read(NMR_LVL_ADR);
-    nmr_brk = EEPROM.read(NMR_BRK_ADR);
+    interrupt_1 = EEPROM.read(INTERRUPT_1_ADR);
+    interrupt_2 = EEPROM.read(INTERRUPT_2_ADR);
+    nmr_lvl_1 = EEPROMReadInt(NMR_LVL1_ADR);
+    nmr_brk_1 = EEPROMReadInt(NMR_BRK1_ADR);
+    nmr_lvl_2 = EEPROMReadInt(NMR_LVL2_ADR);
+    nmr_brk_2 = EEPROMReadInt(NMR_BRK2_ADR);
     if (chk != (cnt_1 - cnt_2)){
-       client.publish("myhome/counter/error", "CHK");
+       error = 1;
     }
   }
 
@@ -104,8 +117,8 @@ void setup(){
   
   if (!namur){
       namurOFF();
-      attachInterrupt(0, Count_1, interrupt);
-      attachInterrupt(1, Count_2, interrupt);
+      attachInterrupt(0, Count_1, interrupt_1);
+      attachInterrupt(1, Count_2, interrupt_2);
   } else {
       namurON();
   }
@@ -136,51 +149,97 @@ void loop(){
   if (namur){
     int in_1 = analogRead(AIN_1);
     int in_2 = analogRead(AIN_2);
-    if (in_1 > nmr_brk && in_1 > nmr_lvl){
+    if (in_1 > nmr_brk_1 && in_1 > nmr_lvl_1){
       Ain_1 = 1;
-    } else if(in_1 > nmr_brk && in_1 < nmr_lvl){
+    } else if(in_1 > nmr_brk_1 && in_1 < nmr_lvl_1){
       Ain_1 = 0;
-    } else if (in_1 < nmr_brk){
-        //client.publish("myhome/counter/error", "Analog input 1");
+    } else if (in_1 < nmr_brk_1){
+        error = 2;
     }
-    if (in_2 > nmr_brk && in_2 > nmr_lvl){
+    if (in_2 > nmr_brk_2 && in_2 > nmr_lvl_2){
       Ain_2 = 1;
-    } else if(in_2 > nmr_brk && in_2 < nmr_lvl){
+    } else if(in_2 > nmr_brk_2 && in_2 < nmr_lvl_2){
       Ain_2 = 0;
-    } else if (in_2 < nmr_brk){
-        //client.publish("myhome/counter/error", "Analog input 2");
+    } else if (in_2 < nmr_brk_2){
+        error = 3;
     }
-    if (Ain_1 != prevAin_1 && Ain_1 == 1){
-      cnt_1++;
+    if (Ain_1 != prevAin_1){
       prevAin_1 = Ain_1;
-      digitalWrite(LED, !digitalRead(LED));
+      switch (interrupt_1) {
+        case 1:
+           cnt_1++;
+          break;
+        case 2:
+           if (Ain_1 == 1){
+             cnt_1++;
+           }
+          break;
+        case 3:
+           if (Ain_1 == 0){
+             cnt_1++;
+           }
+          break;
+      }
+       digitalWrite(LED, !digitalRead(LED));
     }
-    if (Ain_2 != prevAin_2 && Ain_2 == 1){
-      cnt_2++;
+    if (Ain_2 != prevAin_2){
       prevAin_2 = Ain_2;
-      digitalWrite(LED, !digitalRead(LED));
+      switch (interrupt_2) {
+        case 1:
+           cnt_2++;
+          break;
+        case 2:
+           if (Ain_2 == 1){
+             cnt_2++;
+           }
+          break;
+        case 3:
+           if (Ain_2 == 0){
+             cnt_2++;
+           }
+          break;
+      }
+       digitalWrite(LED, !digitalRead(LED));
     }
   }
 
   if (millis() - prevMillis > poll){
-    prevMillis = millis();
-       client.publish("myhome/counter/a1", IntToChar(analogRead(AIN_1))); /**/
-       client.publish("myhome/counter/a2", IntToChar(analogRead(AIN_2))); /**/
-    if (cnt_1 != prev_cnt_1 || cnt_2 != prev_cnt_2){
-      prev_cnt_1 = cnt_1;
-      prev_cnt_2 = cnt_2;
-      client.publish("myhome/counter/count_1", IntToChar(cnt_1 * ratio));
-      client.publish("myhome/counter/count_2", IntToChar(cnt_2 * ratio));
-    }
-  } 
+      prevMillis = millis();
+      client.publish("myhome/counter/a1", IntToChar(analogRead(AIN_1))); /**/
+      client.publish("myhome/counter/a2", IntToChar(analogRead(AIN_2))); /**/
+      if (cnt_1 != prev_cnt_1 || cnt_2 != prev_cnt_2){
+        prev_cnt_1 = cnt_1;
+        prev_cnt_2 = cnt_2;
+        client.publish("myhome/counter/count_1", IntToChar(cnt_1 * ratio));
+        client.publish("myhome/counter/count_2", IntToChar(cnt_2 * ratio));
+      }
+      if (error > 0){
+        switch (error) {
+          case 1:
+             client.publish("myhome/counter/error", "CHK SUMM");
+            break;
+          case 2:
+             client.publish("myhome/counter/error", "Analog input 1");
+            break;
+          case 3:
+             client.publish("myhome/counter/error", "Analog input 2");
+            break;
+        }
+      } else {
+         client.publish("myhome/counter/error", " ");
+      }
+  }
   
 }
 
 void Public(){
-  client.publish("myhome/counter/error", "false");
-  client.publish("myhome/counter/config/namur_lvl", IntToChar(nmr_lvl));
-  client.publish("myhome/counter/config/namur_brk", IntToChar(nmr_brk));
-  client.publish("myhome/counter/config/interrupt", IntToChar(interrupt));
+  client.publish("myhome/counter/error", " ");
+  client.publish("myhome/counter/config/namur_lvl_1", IntToChar(nmr_lvl_1));
+  client.publish("myhome/counter/config/namur_brk_1", IntToChar(nmr_brk_1));
+  client.publish("myhome/counter/config/namur_lvl_2", IntToChar(nmr_lvl_2));
+  client.publish("myhome/counter/config/namur_brk_2", IntToChar(nmr_brk_2));
+  client.publish("myhome/counter/config/interrupt_1", IntToChar(interrupt_1));
+  client.publish("myhome/counter/config/interrupt_2", IntToChar(interrupt_2));
   client.publish("myhome/counter/config/ratio", IntToChar(ratio));
   client.publish("myhome/counter/config/namur", BoolToChar(namur));
   client.publish("myhome/counter/config/polling", IntToChar(poll));
@@ -194,12 +253,12 @@ void Count_1(){
   detachInterrupt (0);
   cnt_1++;
   digitalWrite(LED, !digitalRead(LED));
-  attachInterrupt(0, Count_1, interrupt);
+  attachInterrupt(0, Count_1, interrupt_1);
 }
 void Count_2(){
   detachInterrupt (1);
   cnt_2++;
   digitalWrite(LED, !digitalRead(LED));
-  attachInterrupt(1, Count_2, interrupt);
+  attachInterrupt(1, Count_2, interrupt_2);
 }
 
