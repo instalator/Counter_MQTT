@@ -17,8 +17,23 @@ void callback_iobroker(String strTopic, String strPayload){
   }
   else if (strTopic == "myhome/counter/config/polling") {
       poll = strPayload.toInt();
+      if (poll < 500){
+        poll = 500;
+      } else if (poll > 4294967295){
+        poll = 4294967295;
+      }
       EEPROMWriteLong(POLL_ADR, poll);  //Интервал публикации
       client.publish("myhome/counter/config/polling", IntToChar(poll));
+  }
+  else if (strTopic == "myhome/counter/config/bounce") {
+      bounce = strPayload.toInt();
+      if (bounce < 0){
+        bounce = 0;
+      } else if (bounce > 5000){
+        bounce = 5000;
+      }
+      EEPROMWriteInt(BOUNCE_ADR, bounce);  //Защита от дребезга
+      client.publish("myhome/counter/config/bounce", IntToChar(bounce));
   }
   else if (strTopic == "myhome/counter/config/namur") {
       namur = SrtToBool(strPayload);
@@ -38,8 +53,8 @@ void callback_iobroker(String strTopic, String strPayload){
       ratio = strPayload.toInt();
       if (ratio < 1){
         ratio = 1;
-      } else if (ratio > 255){
-        ratio = 255;
+      } else if (ratio > 32767){
+        ratio = 32767;
       }
       client.publish("myhome/counter/config/ratio", IntToChar(ratio));
   }
@@ -96,22 +111,25 @@ void callback_iobroker(String strTopic, String strPayload){
   }
 }
 void save(){
-  chk = cnt_1 - cnt_2;
+  chk = namur + ratio + interrupt_1 + interrupt_2 + nmr_brk_2 + nmr_brk_1;
   EEPROMWriteLong(CNT1_ADR, cnt_1);  //Пишем показания счетчика в eeprom из переменной
   EEPROMWriteLong(CNT2_ADR, cnt_2);  //Пишем показания счетчика в eeprom из переменной
   EEPROMWriteLong(POLL_ADR, poll);  //Интервал публикации
   EEPROM.write(NAMUR_ADR, BoolToInt(namur));  //тип счетчика
-  EEPROMWriteLong(CHK_ADR, chk); //чек
   EEPROM.write(RATIO_ADR, ratio);  //Множитель
   EEPROM.write(INTERRUPT_1_ADR, interrupt_1); //Вектор прерывания
   EEPROM.write(INTERRUPT_2_ADR, interrupt_2); //Вектор прерывания
+  EEPROMWriteInt(BOUNCE_ADR, bounce);  //Защита от дребезга
   EEPROMWriteInt(NMR_LVL1_ADR, nmr_lvl_1);  //Namur высокий уровень
   EEPROMWriteInt(NMR_BRK1_ADR, nmr_brk_1);  //Namur уровень обрыва
   EEPROMWriteInt(NMR_LVL2_ADR, nmr_lvl_2);  //Namur высокий уровень
   EEPROMWriteInt(NMR_BRK2_ADR, nmr_brk_2);  //Namur уровень обрыва
+  EEPROMWriteLong(CHK_ADR, chk); //чек
 }
 
 void reboot(){
+  save();
+  delay(500);
   wdt_enable(WDTO_1S);
   for(;;){}
 }
