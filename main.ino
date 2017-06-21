@@ -23,7 +23,7 @@ IPAddress server(192, 168, 1, 190);
 #define CTRL_A2 7  //Выход для управления коммутатором
 #define LED     9  //Светодиод
 
-#define CHK_ADR         99
+#define CHK_ADR         100
 #define CNT1_ADR        10
 #define CNT2_ADR        20
 #define POLL_ADR        30
@@ -35,17 +35,20 @@ IPAddress server(192, 168, 1, 190);
 #define NMR_BRK1_ADR    72
 #define NMR_LVL2_ADR    74
 #define NMR_BRK2_ADR    76
+#define BOUNCE_ADR      78
 
 
 volatile unsigned long cnt_1 = 0;
 volatile unsigned long cnt_2 = 0;
-unsigned long prev_cnt_1;
-unsigned long prev_cnt_2;
+unsigned long prev_cnt_1 = 2;
+unsigned long prev_cnt_2 = 2;
 unsigned long chk = 0;
+unsigned long chk_S = 0;
 long prevMillis = 0;
+long prevMillis_cnt = 0;
 bool namur = false;
-long poll = 5000;
-int ratio = 1; //Множитель от 1 до 255
+unsigned long poll = 5000;
+int ratio = 1; //Множитель от 1 до 32767
 int interrupt_1 = FALLING;
 int interrupt_2 = FALLING;
 int nmr_lvl_1 = 512;
@@ -56,6 +59,7 @@ int Ain_1 = 0;
 int Ain_2 = 0;
 int prevAin_1;
 int prevAin_2;
+int bounce = 0;
 bool error = 0;
 
 
@@ -84,11 +88,11 @@ void reconnect() {
 }
 
 void setup() {
+  MCUSR = 0;
+  wdt_disable();
   //Serial.begin(9600);
-  if (EEPROM.read(1) != 88 && EEPROM.read(90) != 99) { //Если первый запуск
+  if (EEPROM.read(1) != 88) { //Если первый запуск
     EEPROM.write(1, 88);
-    EEPROM.write(90, 99);
-    save();
   } else {
     chk = EEPROMReadLong(CHK_ADR);
     cnt_1 = EEPROMReadLong(CNT1_ADR);
@@ -102,7 +106,9 @@ void setup() {
     nmr_brk_1 = EEPROMReadInt(NMR_BRK1_ADR);
     nmr_lvl_2 = EEPROMReadInt(NMR_LVL2_ADR);
     nmr_brk_2 = EEPROMReadInt(NMR_BRK2_ADR);
-    if (chk != (cnt_1 - cnt_2)) {
+    bounce = EEPROMReadInt(BOUNCE_ADR);
+    chk_S = namur + ratio + interrupt_1 + interrupt_2 + nmr_brk_2 + nmr_brk_1;
+    if (chk != chk_S) {
       error = 1;
     }
   }
@@ -130,6 +136,7 @@ void setup() {
   client.setCallback(callback);
   Ethernet.begin(mac, ip);
   delay(100);
+  
   wdt_enable(WDTO_8S);
 
   if (client.connect(id_connect)) {
@@ -206,7 +213,8 @@ void loop() {
     }
   }
 
-  if (millis() - prevMillis > poll) {
+  if (millis() - prevMillis >= poll) {
+    wdt_reset();
     prevMillis = millis();
     if (namur) {
       client.publish("myhome/counter/A_1", IntToChar(analogRead(AIN_1))); /**/
@@ -219,17 +227,19 @@ void loop() {
       client.publish("myhome/counter/count_2", IntToChar(cnt_2 * ratio));
     }
     if (error > 0) {
+      char* e = "err";
       switch (error) {
         case 1:
-          client.publish("myhome/counter/error", "CHK SUMM");
+          e = "CHK SUMM";
           break;
         case 2:
-          client.publish("myhome/counter/error", "Break Analog input 1");
+          e = "Break Analog input 1";
           break;
         case 3:
-          client.publish("myhome/counter/error", "Break Analog input 2");
+          e = "Break Analog input 2";
           break;
       }
+      client.publish("myhome/counter/error", e);
     } else {
       client.publish("myhome/counter/error", " ");
     }
@@ -241,6 +251,7 @@ void Public() {
   client.publish("myhome/counter/error", " ");
   client.publish("myhome/counter/count_1", IntToChar(cnt_1 * ratio));
   client.publish("myhome/counter/count_2", IntToChar(cnt_2 * ratio));
+  client.publish("myhome/counter/config/bounce", IntToChar(bounce));
   client.publish("myhome/counter/config/namur_lvl_1", IntToChar(nmr_lvl_1));
   client.publish("myhome/counter/config/namur_brk_1", IntToChar(nmr_brk_1));
   client.publish("myhome/counter/config/namur_lvl_2", IntToChar(nmr_lvl_2));
@@ -258,14 +269,20 @@ void Public() {
 
 void Count_1() {
   detachInterrupt (0);
-  cnt_1++;
-  digitalWrite(LED, !digitalRead(LED));
+  if (millis() - prevMillis_cnt >= bounce){
+    prevMillis_cnt = millis();
+    cnt_1++;
+    digitalWrite(LED, !digitalRead(LED));
+  }
   attachInterrupt(0, Count_1, interrupt_1);
 }
 void Count_2() {
   detachInterrupt (1);
-  cnt_2++;
-  digitalWrite(LED, !digitalRead(LED));
+  if (millis() - prevMillis_cnt >= bounce){
+    prevMillis_cnt = millis();
+    cnt_2++;
+    digitalWrite(LED, !digitalRead(LED));
+  }
   attachInterrupt(1, Count_2, interrupt_2);
 }
 
