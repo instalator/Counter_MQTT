@@ -6,8 +6,6 @@
 
 // Update these with values suitable for your network.
 byte mac[]    = {  0xC4, 0xE7, 0xC4, 0x3E, 0x3E, 0x12 };
-IPAddress ip(192, 168, 1, 171);
-IPAddress server(192, 168, 1, 190);
 
 #define id_connect "counter"
 #define Prefix_subscribe "myhome/counter/"
@@ -87,12 +85,24 @@ void reconnect() {
   }
 }
 
+byte ip[4] = {192, 168, 1, 171};
+byte server[4] = {192, 168, 1, 190};
+
 void setup() {
+  //IPAddress ip(192, 168, 1, 171);
+  //IPAddress server(192, 168, 1, 190);
+  
   MCUSR = 0;
   wdt_disable();
   //Serial.begin(9600);
   if (EEPROM.read(1) != 88) { //Если первый запуск
     EEPROM.write(1, 88);
+    for (int i = 110 ; i < 114; i++){
+       EEPROM.write(i, ip[i]);
+    }
+    for (int i = 120 ; i < 124; i++){
+       EEPROM.write(i, ip[i]);
+    }
   } else {
     chk = EEPROMReadLong(CHK_ADR);
     cnt_1 = EEPROMReadLong(CNT1_ADR);
@@ -110,6 +120,12 @@ void setup() {
     chk_S = namur + ratio + interrupt_1 + interrupt_2 + nmr_brk_2 + nmr_brk_1;
     if (chk != chk_S) {
       error = 1;
+    }
+    for (int i = 110; i < 114; i++){
+      ip[i] = EEPROM.read(i);
+    }
+    for (int i = 120; i < 124; i++){
+      server[i] = EEPROM.read(i);
     }
   }
 
@@ -248,6 +264,9 @@ void loop() {
 }
 
 void Public() {
+  char s[16];  
+  sprintf(s, "%d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
+  client.publish("myhome/counter/config/ip", s);
   client.publish("myhome/counter/error", " ");
   client.publish("myhome/counter/count_1", IntToChar(cnt_1 * ratio));
   client.publish("myhome/counter/count_2", IntToChar(cnt_2 * ratio));
