@@ -110,6 +110,8 @@ void callback_iobroker(String strTopic, String strPayload){
       client.publish("myhome/counter/config/namur_brk_2", IntToChar(nmr_brk_2));
   }
 }
+
+
 void save(){
   chk = namur + ratio + interrupt_1 + interrupt_2 + nmr_brk_2 + nmr_brk_1;
   EEPROMWriteLong(CNT1_ADR, cnt_1);  //Пишем показания счетчика в eeprom из переменной
