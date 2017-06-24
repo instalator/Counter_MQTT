@@ -6,8 +6,9 @@ void callback_iobroker(String strTopic, String strPayload){
     }
   }
   else if (strTopic == "myhome/counter/correction") {
-      cnt_1 = strPayload.substring(0,strPayload.indexOf(';')).toInt() / ratio;
-      cnt_2 = strPayload.substring(strPayload.lastIndexOf(';')+1).toInt() / ratio;
+      cnt_1 = atol(strPayload.substring(0,strPayload.indexOf(';')).c_str()) / ratio;
+      cnt_2 = atol(strPayload.substring(strPayload.lastIndexOf(';')+1).c_str()) / ratio;
+      client.publish("myhome/counter/correction", "0;0");
   }
   else if (strTopic == "myhome/counter/save") {
     if (strPayload == "true"){
@@ -139,7 +140,6 @@ void reboot(){
 char* IntToChar (unsigned long intV) {
   String data = String(intV, DEC);
   int length = data.length();
-  char b[50];
   data.toCharArray(b,length + 1);
   return b;
 }
