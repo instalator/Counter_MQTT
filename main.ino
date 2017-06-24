@@ -5,7 +5,9 @@
 #include <avr/wdt.h>
 
 // Update these with values suitable for your network.
-byte mac[]    = {  0xC4, 0xE7, 0xC4, 0x3E, 0x3E, 0x12 };
+byte mac[]    = {  0xC4, 0xE7, 0xC4, 0x3E, 0x8E, 0x19 };
+byte ip[4] = {192, 168, 1, 50};
+byte server[4] = {192, 168, 1, 190};
 
 #define id_connect "counter"
 #define Prefix_subscribe "myhome/counter/"
@@ -42,7 +44,7 @@ unsigned long prev_cnt_1 = 2;
 unsigned long prev_cnt_2 = 2;
 unsigned long chk = 0;
 unsigned long chk_S = 0;
-long prevMillis = 0;
+volatile long prevMillis = 0;
 long prevMillis_cnt = 0;
 bool namur = false;
 unsigned long poll = 5000;
@@ -59,6 +61,7 @@ int prevAin_1;
 int prevAin_2;
 int bounce = 0;
 bool error = 0;
+char b[50];
 
 
 ////////////////////////////////////////////////////////////////////////////
@@ -73,27 +76,26 @@ EthernetClient ethClient;
 PubSubClient client(ethClient);
 
 void reconnect() {
-  digitalWrite(LED, !digitalRead(LED));
+  int a = 0;
   wdt_reset();
+  digitalWrite(LED, !digitalRead(LED));
   while (!client.connected()) {
+    a++;
     if (client.connect(id_connect)) {
       Public();
       digitalWrite(LED, LOW);
     } else {
-      delay(5000);
+      delay(10000);
     }
+    if (a >= 10){wdt_reset();}
   }
 }
 
-byte ip[4] = {192, 168, 1, 171};
-byte server[4] = {192, 168, 1, 190};
-
 void setup() {
-  //IPAddress ip(192, 168, 1, 171);
-  //IPAddress server(192, 168, 1, 190);
-  
   MCUSR = 0;
   wdt_disable();
+  delay(20000);
+  
   //Serial.begin(9600);
   if (EEPROM.read(1) != 88) { //Если первый запуск
     EEPROM.write(1, 88);
@@ -242,7 +244,7 @@ void loop() {
       client.publish("myhome/counter/count_1", IntToChar(cnt_1 * ratio));
       client.publish("myhome/counter/count_2", IntToChar(cnt_2 * ratio));
     }
-    if (error > 0) {
+    if (error > 0) { 
       char* e = "err";
       switch (error) {
         case 1:
@@ -264,11 +266,11 @@ void loop() {
 }
 
 void Public() {
-  char s[16];  
+  char s[16];
   sprintf(s, "%d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
   client.publish("myhome/counter/config/ip", s);
   client.publish("myhome/counter/error", " ");
-  client.publish("myhome/counter/count_1", IntToChar(cnt_1 * ratio));
+  client.publish("myhome/counter/count_1",IntToChar(cnt_1 * ratio));
   client.publish("myhome/counter/count_2", IntToChar(cnt_2 * ratio));
   client.publish("myhome/counter/config/bounce", IntToChar(bounce));
   client.publish("myhome/counter/config/namur_lvl_1", IntToChar(nmr_lvl_1));
