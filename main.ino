@@ -10,7 +10,6 @@ byte ip[4] = {192, 168, 1, 50};
 byte server[4] = {192, 168, 1, 190};
 
 #define id_connect "counter"
-#define Prefix_subscribe "myhome/counter/"
 
 #define PWR_CTRL   A2 //Контроль напряжения
 #define IN_1    2  //Первый вход
@@ -45,7 +44,7 @@ unsigned long prev_cnt_2 = 2;
 unsigned long chk = 0;
 unsigned long chk_S = 0;
 volatile long prevMillis = 0;
-long prevMillis_cnt = 0;
+volatile long prevMillis_cnt = 0;
 bool namur = false;
 unsigned long poll = 5000;
 int ratio = 1; //Множитель от 1 до 32767
@@ -62,7 +61,7 @@ int prevAin_2;
 int bounce = 0;
 bool error = 0;
 char b[50];
-
+char s[16];
 
 ////////////////////////////////////////////////////////////////////////////
 void callback(char* topic, byte* payload, unsigned int length) {
@@ -94,16 +93,15 @@ void reconnect() {
 void setup() {
   MCUSR = 0;
   wdt_disable();
-  delay(20000);
-  
+  //delay(20000);
   //Serial.begin(9600);
   if (EEPROM.read(1) != 88) { //Если первый запуск
     EEPROM.write(1, 88);
-    for (int i = 110 ; i < 114; i++){
-       EEPROM.write(i, ip[i]);
+    for (int i = 0 ; i < 4; i++) {
+      EEPROM.write(110 + i, ip[i]);
     }
-    for (int i = 120 ; i < 124; i++){
-       EEPROM.write(i, ip[i]);
+    for (int i = 0 ; i < 4; i++) {
+      EEPROM.write(120 + i, server[i]);
     }
   } else {
     chk = EEPROMReadLong(CHK_ADR);
@@ -123,12 +121,13 @@ void setup() {
     if (chk != chk_S) {
       error = 1;
     }
-    for (int i = 110; i < 114; i++){
-      ip[i] = EEPROM.read(i);
+    for (int i = 0; i < 4; i++) {
+      ip[i] = EEPROM.read(110 + i);
     }
-    for (int i = 120; i < 124; i++){
-      server[i] = EEPROM.read(i);
+    for (int i = 0; i < 4; i++) {
+      server[i] = EEPROM.read(120 + i);
     }
+    sprintf(s, "%d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
   }
 
   prev_cnt_1 = cnt_1;
@@ -154,9 +153,8 @@ void setup() {
   client.setCallback(callback);
   Ethernet.begin(mac, ip);
   delay(100);
-  
   wdt_enable(WDTO_8S);
-
+    
   if (client.connect(id_connect)) {
     Public();
   }
@@ -175,60 +173,7 @@ void loop() {
   }
 
   if (namur) {
-    int in_1 = analogRead(AIN_1);
-    int in_2 = analogRead(AIN_2);
-    if (in_1 > nmr_brk_1 && in_1 > nmr_lvl_1) {
-      Ain_1 = 1;
-    } else if (in_1 > nmr_brk_1 && in_1 < nmr_lvl_1) {
-      Ain_1 = 0;
-    } else if (in_1 < nmr_brk_1) {
-      error = 2;
-    }
-    if (in_2 > nmr_brk_2 && in_2 > nmr_lvl_2) {
-      Ain_2 = 1;
-    } else if (in_2 > nmr_brk_2 && in_2 < nmr_lvl_2) {
-      Ain_2 = 0;
-    } else if (in_2 < nmr_brk_2) {
-      error = 3;
-    }
-    if (Ain_1 != prevAin_1) {
-      prevAin_1 = Ain_1;
-      switch (interrupt_1) {
-        case 1:
-          cnt_1++;
-          break;
-        case 2:
-          if (Ain_1 == 1) {
-            cnt_1++;
-          }
-          break;
-        case 3:
-          if (Ain_1 == 0) {
-            cnt_1++;
-          }
-          break;
-      }
-      digitalWrite(LED, !digitalRead(LED));
-    }
-    if (Ain_2 != prevAin_2) {
-      prevAin_2 = Ain_2;
-      switch (interrupt_2) {
-        case 1:
-          cnt_2++;
-          break;
-        case 2:
-          if (Ain_2 == 1) {
-            cnt_2++;
-          }
-          break;
-        case 3:
-          if (Ain_2 == 0) {
-            cnt_2++;
-          }
-          break;
-      }
-      digitalWrite(LED, !digitalRead(LED));
-    }
+    ReadNamur();
   }
 
   if (millis() - prevMillis >= poll) {
@@ -241,8 +186,8 @@ void loop() {
     if (cnt_1 != prev_cnt_1 || cnt_2 != prev_cnt_2) {
       prev_cnt_1 = cnt_1;
       prev_cnt_2 = cnt_2;
-      client.publish("myhome/counter/count_1", IntToChar(cnt_1 * ratio));
-      client.publish("myhome/counter/count_2", IntToChar(cnt_2 * ratio));
+      client.publish("myhome/counter/count_1", IntToChar(cnt_1));
+      client.publish("myhome/counter/count_2", IntToChar(cnt_2));
     }
     if (error > 0) { 
       char* e = "err";
@@ -251,10 +196,10 @@ void loop() {
           e = "CHK SUMM";
           break;
         case 2:
-          e = "Break Analog input 1";
+          e = "Break input 1";
           break;
         case 3:
-          e = "Break Analog input 2";
+          e = "Break input 2";
           break;
       }
       client.publish("myhome/counter/error", e);
@@ -264,14 +209,25 @@ void loop() {
   }
 
 }
+/*
+char* IntToChar (int intV) {
+  String data = String(intV, DEC);
+  int length = data.length();
+  data.toCharArray(b,length + 1);
+  return b;
+}*/
+
+char* IntToChar (unsigned long a) {
+  char buffer [50];
+  int n = sprintf (buffer, "%lu", a);
+  return buffer;
+}
 
 void Public() {
-  char s[16];
-  sprintf(s, "%d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
-  client.publish("myhome/counter/config/ip", s);
-  client.publish("myhome/counter/error", " ");
-  client.publish("myhome/counter/count_1",IntToChar(cnt_1 * ratio));
+  client.publish("myhome/counter/count_1", IntToChar(cnt_1 * ratio));
   client.publish("myhome/counter/count_2", IntToChar(cnt_2 * ratio));
+  client.publish("myhome/counter/config/ip", s);
+  client.publish("myhome/counter/error", "");
   client.publish("myhome/counter/config/bounce", IntToChar(bounce));
   client.publish("myhome/counter/config/namur_lvl_1", IntToChar(nmr_lvl_1));
   client.publish("myhome/counter/config/namur_brk_1", IntToChar(nmr_brk_1));
@@ -283,6 +239,7 @@ void Public() {
   client.publish("myhome/counter/config/namur", BoolToChar(namur));
   client.publish("myhome/counter/config/polling", IntToChar(poll));
   client.publish("myhome/counter/save", "false");
+  client.publish("myhome/counter/config/reset", "false");
   client.publish("myhome/counter/correction", "0;0");
   client.publish("myhome/counter/connection", "true");
   client.subscribe("myhome/counter/#");
