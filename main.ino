@@ -48,8 +48,8 @@ volatile long prevMillis_cnt = 0;
 bool namur = false;
 unsigned long poll = 5000;
 int ratio = 1; //Множитель от 1 до 32767
-int interrupt_1 = FALLING;
-int interrupt_2 = FALLING;
+int interrupt_1 = RISING;
+int interrupt_2 = RISING;
 int nmr_lvl_1 = 512;
 int nmr_brk_1 = 200;
 int nmr_lvl_2 = 512;
@@ -84,16 +84,16 @@ void reconnect() {
       Public();
       digitalWrite(LED, LOW);
     } else {
-      delay(10000);
+      delay(5000);
     }
-    if (a >= 10){wdt_reset();}
+    if (a <= 10){wdt_reset();}
   }
 }
 
 void setup() {
   MCUSR = 0;
   wdt_disable();
-  //delay(20000);
+  delay(20000);
   //Serial.begin(9600);
   if (EEPROM.read(1) != 88) { //Если первый запуск
     EEPROM.write(1, 88);
@@ -103,6 +103,7 @@ void setup() {
     for (int i = 0 ; i < 4; i++) {
       EEPROM.write(120 + i, server[i]);
     }
+    reboot();
   } else {
     chk = EEPROMReadLong(CHK_ADR);
     cnt_1 = EEPROMReadLong(CNT1_ADR);
@@ -175,7 +176,7 @@ void loop() {
   if (namur) {
     ReadNamur();
   }
-
+  
   if (millis() - prevMillis >= poll) {
     wdt_reset();
     prevMillis = millis();
@@ -209,13 +210,6 @@ void loop() {
   }
 
 }
-/*
-char* IntToChar (int intV) {
-  String data = String(intV, DEC);
-  int length = data.length();
-  data.toCharArray(b,length + 1);
-  return b;
-}*/
 
 char* IntToChar (unsigned long a) {
   char buffer [50];
