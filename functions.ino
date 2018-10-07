@@ -4,12 +4,12 @@ void callback_iobroker(String strTopic, String strPayload){
   if (strTopic == "myhome/counter/correction") {
       cnt_1 = atol(strPayload.substring(0,strPayload.indexOf(';')).c_str()) / ratio;
       cnt_2 = atol(strPayload.substring(strPayload.lastIndexOf(';')+1).c_str()) / ratio;
-      client.publish("myhome/counter/correction", "0;0");
+      mqtt.publish("myhome/counter/correction", "0;0");
   }
   else if (strTopic == "myhome/counter/save") {
     if (strPayload == "true"){
       save();
-      client.publish("myhome/counter/save", "false");
+      mqtt.publish("myhome/counter/save", "false");
     }
   }
   else if (strTopic == "myhome/counter/config/polling") {
@@ -20,7 +20,7 @@ void callback_iobroker(String strTopic, String strPayload){
         poll = 4294967295;
       }
       EEPROMWriteLong(POLL_ADR, poll);  //Интервал публикации
-      client.publish("myhome/counter/config/polling", IntToChar(poll));
+      mqtt.publish("myhome/counter/config/polling", IntToChar(poll));
   }
   else if (strTopic == "myhome/counter/config/bounce") {
       bounce = strPayload.toInt();
@@ -30,19 +30,19 @@ void callback_iobroker(String strTopic, String strPayload){
         bounce = 5000;
       }
       EEPROMWriteInt(BOUNCE_ADR, bounce);  //Защита от дребезга
-      client.publish("myhome/counter/config/bounce", IntToChar(bounce));
+      mqtt.publish("myhome/counter/config/bounce", IntToChar(bounce));
   }
   else if (strTopic == "myhome/counter/config/namur") {
       namur = SrtToBool(strPayload);
       EEPROM.write(NAMUR_ADR, BoolToInt(namur));
-      client.publish("myhome/counter/config/namur", BoolToChar(namur));
+      mqtt.publish("myhome/counter/config/namur", BoolToChar(namur));
       save();
       reboot();
   }
   else if (strTopic == "myhome/counter/config/reset") {
       if(strPayload == "true"){
         save();
-        client.publish("myhome/counter/config/reset", "false");
+        mqtt.publish("myhome/counter/config/reset", "false");
         reboot();
       }
   }
@@ -53,7 +53,7 @@ void callback_iobroker(String strTopic, String strPayload){
       } else if (ratio > 32767){
         ratio = 32767;
       }
-      client.publish("myhome/counter/config/ratio", IntToChar(ratio));
+      mqtt.publish("myhome/counter/config/ratio", IntToChar(ratio));
   }
   else if (strTopic == "myhome/counter/config/interrupt_1") {
       interrupt_1 = strPayload.toInt();
@@ -62,11 +62,7 @@ void callback_iobroker(String strTopic, String strPayload){
       } else if (ratio > 3){
         interrupt_1 = 3;
       }
-      if (!namur){
-        attachInterrupt(0, Count_1, interrupt_1);
-        attachInterrupt(1, Count_2, interrupt_2);
-      }
-      client.publish("myhome/counter/config/interrupt_1", IntToChar(interrupt_1));
+      mqtt.publish("myhome/counter/config/interrupt_1", IntToChar(interrupt_1));
   }
   else if (strTopic == "myhome/counter/config/interrupt_2") {
       interrupt_2 = strPayload.toInt();
@@ -75,31 +71,27 @@ void callback_iobroker(String strTopic, String strPayload){
       } else if (ratio > 3){
         interrupt_2 = 3;
       }
-      if (!namur){
-        attachInterrupt(0, Count_1, interrupt_1);
-        attachInterrupt(1, Count_2, interrupt_2);
-      }
-      client.publish("myhome/counter/config/interrupt_2", IntToChar(interrupt_2));
+      mqtt.publish("myhome/counter/config/interrupt_2", IntToChar(interrupt_2));
   }
   else if (strTopic == "myhome/counter/config/namur_lvl_1") {
       nmr_lvl_1 = strPayload.toInt();
       EEPROMWriteInt(NMR_LVL1_ADR, nmr_lvl_1);  //Namur высокий уровень
-      client.publish("myhome/counter/config/namur_lvl_1", IntToChar(nmr_lvl_1));
+      mqtt.publish("myhome/counter/config/namur_lvl_1", IntToChar(nmr_lvl_1));
   }
   else if (strTopic == "myhome/counter/config/namur_brk_1") {
       nmr_brk_1 = strPayload.toInt();
       EEPROMWriteInt(NMR_BRK1_ADR, nmr_brk_1);  //Namur уровень обрыва
-      client.publish("myhome/counter/config/namur_brk_1", IntToChar(nmr_brk_1));
+      mqtt.publish("myhome/counter/config/namur_brk_1", IntToChar(nmr_brk_1));
   }
   else if (strTopic == "myhome/counter/config/namur_lvl_2") {
       nmr_lvl_2 = strPayload.toInt();
       EEPROMWriteInt(NMR_LVL2_ADR, nmr_lvl_2);  //Namur высокий уровень
-      client.publish("myhome/counter/config/namur_lvl_2", IntToChar(nmr_lvl_2));
+      mqtt.publish("myhome/counter/config/namur_lvl_2", IntToChar(nmr_lvl_2));
   }
   else if (strTopic == "myhome/counter/config/namur_brk_2") {
       nmr_brk_2 = strPayload.toInt();
       EEPROMWriteInt(NMR_BRK2_ADR, nmr_brk_2);  //Namur уровень обрыва
-      client.publish("myhome/counter/config/namur_brk_2", IntToChar(nmr_brk_2));
+      mqtt.publish("myhome/counter/config/namur_brk_2", IntToChar(nmr_brk_2));
   }
 }
 
@@ -136,20 +128,12 @@ int SrtToBool(String t){
     }
 }
 
-char* BoolToChar (bool r) {
-    if (r == true){
-      return "true";
-    } else{
-      return "false";
-    }
+const char* BoolToChar (bool r) {
+    return r ? "true" : "false";
 }
 
 int BoolToInt(bool s){
-    if (s){
-      return 1;
-    } else {
-      return 0;
-    }
+    return s ? 1 : 0;
 }
 int IntToBool(int i){
     if (i == 1){
@@ -159,14 +143,6 @@ int IntToBool(int i){
     }
 }
 
-/*
-   char* StrToChar (String str){
-    int length = str.length();
-    //char b[50];
-    str.toCharArray(b, length + 1);
-    return b;
-}
-*/
 void namurON(){
   digitalWrite(CTRL_D1, LOW);
   digitalWrite(CTRL_D2, LOW);
@@ -248,6 +224,7 @@ void ReadNamur(){
           }
           break;
       }
+      //mqtt.publish("myhome/counter/count_1", LongToChar(cnt_1));
       digitalWrite(LED, !digitalRead(LED));
     }
     if (Ain_2 != prevAin_2) {
@@ -267,6 +244,7 @@ void ReadNamur(){
           }
           break;
       }
+      //mqtt.publish("myhome/counter/count_2", LongToChar(cnt_2));
       digitalWrite(LED, !digitalRead(LED));
     }
 }
